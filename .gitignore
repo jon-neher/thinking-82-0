@@ -4,6 +4,7 @@ web/node_modules/
 
 # Build output
 web/dist/
+web/src/data/players.json
 dist/
 *.tsbuildinfo
 
