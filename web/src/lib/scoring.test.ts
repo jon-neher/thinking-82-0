@@ -111,4 +111,58 @@ describe("evaluateRoster", () => {
     );
     expect(overloaded.usageFitNR).toBeLessThan(balanced.usageFitNR);
   });
+
+  it("rewards slot archetype fit beyond listed position", () => {
+    const guardArchetype = makePlayer("Guard", "SF", {
+      pos2: ["PG", "C"],
+      m: {
+        ...makePlayer("Guard", "SF").m,
+        zPts: 1.3,
+        zAst: 1.6,
+        zReb: -0.2,
+        zBlk: -0.6,
+        shooting: 1.2,
+        rimDef: -0.3,
+        perimDef: 1.1,
+      },
+    });
+    const bigArchetype = makePlayer("Big", "SF", {
+      pos2: ["PG", "C"],
+      m: {
+        ...makePlayer("Big", "SF").m,
+        zPts: 0.4,
+        zAst: -0.4,
+        zReb: 1.6,
+        zBlk: 1.4,
+        shooting: -0.2,
+        rimDef: 1.4,
+        perimDef: -0.3,
+      },
+    });
+
+    const natural = evaluateRoster(
+      roster({
+        PG: guardArchetype,
+        SG: makePlayer("B", "SG"),
+        SF: makePlayer("C", "SF"),
+        PF: makePlayer("D", "PF"),
+        C: bigArchetype,
+        SIXTH: makePlayer("F", "SG"),
+      }),
+    );
+
+    const inverted = evaluateRoster(
+      roster({
+        PG: bigArchetype,
+        SG: makePlayer("B", "SG"),
+        SF: makePlayer("C", "SF"),
+        PF: makePlayer("D", "PF"),
+        C: guardArchetype,
+        SIXTH: makePlayer("F", "SG"),
+      }),
+    );
+
+    expect(natural.positionFitNR).toBeGreaterThan(inverted.positionFitNR);
+    expect(natural.wins).toBeGreaterThan(inverted.wins);
+  });
 });

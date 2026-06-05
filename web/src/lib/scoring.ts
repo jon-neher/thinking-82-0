@@ -69,6 +69,39 @@ function slotPenalty(slot: DraftSlot, pos: string, pos2: string[]): number {
   return 4;
 }
 
+function slotArchetypeValue(slot: DraftSlot, assignment: SlotAssignment): number {
+  const player = assignment.player;
+  const guardCreation = 0.7 * player.m.zAst + 0.35 * player.m.perimDef;
+  const scoringPortability = 0.6 * player.m.zPts + 0.7 * player.m.shooting;
+  const bigInterior = 0.8 * player.m.zReb + 0.9 * player.m.rimDef + 0.35 * player.m.zBlk;
+  const twoWayWing =
+    0.45 * player.m.zPts + 0.4 * player.m.zReb + 0.35 * player.m.zAst + 0.3 * player.m.perimDef;
+
+  let value = 0;
+  switch (slot) {
+    case "PG":
+      value = 0.9 * guardCreation + 0.35 * scoringPortability - 0.2 * bigInterior;
+      break;
+    case "SG":
+      value = 0.75 * scoringPortability + 0.4 * guardCreation + 0.25 * player.m.perimDef;
+      break;
+    case "SF":
+      value = 0.85 * twoWayWing + 0.25 * scoringPortability;
+      break;
+    case "PF":
+      value = 0.7 * bigInterior + 0.3 * twoWayWing + 0.15 * scoringPortability;
+      break;
+    case "C":
+      value = 0.95 * bigInterior + 0.2 * player.m.dbpmEff - 0.15 * player.m.perimDef;
+      break;
+    case "SIXTH":
+      value = 0.6 * scoringPortability + 0.3 * guardCreation + 0.25 * twoWayWing;
+      break;
+  }
+  const rolePenalty = slot === "SIXTH" ? 0 : Math.max(0, -value) * 0.35;
+  return value - rolePenalty;
+}
+
 export function evaluateRoster(assignments: SlotAssignment[]): TeamScore {
   if (assignments.length !== 6) {
     throw new Error("Roster must include 6 drafted players.");
@@ -166,9 +199,18 @@ export function evaluateRoster(assignments: SlotAssignment[]): TeamScore {
   );
 
   let positionFitNR = 0;
+  let slotValueFitNR = 0;
   for (const { slot, player } of assignments) {
+    const minuteWeight = SLOT_MINUTES[slot] / CORE_MINUTES_TOTAL;
+    const positions = primaryAndSecondary(player.pos, player.pos2);
+    const isNaturalAtSlot = slot !== "SIXTH" && positions.includes(slot);
     positionFitNR -= (SLOT_MINUTES[slot] / 34) * slotPenalty(slot, player.pos, player.pos2);
+    slotValueFitNR += minuteWeight * slotArchetypeValue(slot, { slot, player });
+    if (isNaturalAtSlot) {
+      slotValueFitNR += 0.08 * minuteWeight;
+    }
   }
+  positionFitNR = clamp(positionFitNR + 1.4 * slotValueFitNR, -8, 3);
 
   const rawTeamNR = baseTeamNR + usageFitNR + spacingFitNR + defenseFitNR + positionFitNR;
   const teamNetRating = clamp(rawTeamNR, -25, 25);
