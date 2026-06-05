@@ -29,7 +29,7 @@ const EMPTY_ROSTER: Record<DraftSlot, PlayerSeason | undefined> = {
 };
 
 function positionsFor(player: PlayerSeason): Set<string> {
-  return new Set([player.pos, ...player.pos2.split(",")].map((value) => value.trim()).filter(Boolean));
+  return new Set([player.pos, ...player.pos2].map((value) => value.trim()).filter(Boolean));
 }
 
 function canPlaySlot(player: PlayerSeason, slot: DraftSlot): boolean {

@@ -50,7 +50,7 @@ export interface PlayerSeason {
   decade: string;
   season: number;
   pos: string;
-  pos2: string;
+  pos2: string[];
   g: number;
   mpg: number;
   box: PlayerBox;

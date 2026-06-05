@@ -39,12 +39,12 @@ function mean(values: number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function primaryAndSecondary(pos: string, pos2: string): string[] {
-  const parts = [pos, ...pos2.split(",")].map((part) => part.trim()).filter(Boolean);
+function primaryAndSecondary(pos: string, pos2: string[]): string[] {
+  const parts = [pos, ...pos2].map((part) => part.trim()).filter(Boolean);
   return Array.from(new Set(parts));
 }
 
-function slotPenalty(slot: DraftSlot, pos: string, pos2: string): number {
+function slotPenalty(slot: DraftSlot, pos: string, pos2: string[]): number {
   if (slot === "SIXTH") {
     return 0;
   }

@@ -11,7 +11,7 @@ function makePlayer(name: string, pos: string, overrides?: Partial<PlayerSeason>
     decade: "1980s",
     season: 1986,
     pos,
-    pos2: "",
+    pos2: [],
     g: 80,
     mpg: 34,
     box: { pts: 25, reb: 8, ast: 6, stl: 1.5, blk: 1.1 },
