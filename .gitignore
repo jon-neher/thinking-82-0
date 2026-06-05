@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+web/node_modules/
+
+# Build output
+web/dist/
+dist/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Scraper cache (raw HTML can be re-fetched; large)
+data/raw/
+
+# Env / editor / OS
+.env
+.env.local
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
