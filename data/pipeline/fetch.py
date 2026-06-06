@@ -1,7 +1,7 @@
 """
 Polite scraper for Basketball-Reference season league tables.
 
-Fetches per-season tables (per_game / advanced / per_poss), caches raw HTML to
+Fetches per-season tables (per_game / advanced / per_poss / play_by_play), caches raw HTML to
 data/raw/, and parses rows keyed by BBR player id + team using the stable
 `data-stat` attributes. Real data only.
 
@@ -31,6 +31,7 @@ TABLES = {
     "per_game": ("per_game", "per_game_stats"),
     "advanced": ("advanced", "advanced"),
     "per_poss": ("per_poss", "per_poss"),
+    "play_by_play": ("play-by-play", "pbp_stats"),
 }
 
 
@@ -57,7 +58,7 @@ def fetch_html(season: int, ttype: str, force: bool = False) -> str | None:
             html = resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            # e.g. per_poss before 1974 — expected; cache a sentinel.
+            # e.g. per_poss / play_by_play in unsupported eras — expected; cache a sentinel.
             with open(path, "w", encoding="utf-8") as f:
                 f.write("<!--404-->")
             time.sleep(RATE_LIMIT_SECONDS)
@@ -165,8 +166,11 @@ def main() -> None:
         for ttype in TABLES:
             rows = get_season_table(season, ttype, force=args.force)
             counts[ttype] = len(rows)
-        print(f"{season}: per_game={counts['per_game']:>4}  "
-              f"advanced={counts['advanced']:>4}  per_poss={counts['per_poss']:>4}")
+        print(
+            f"{season}: per_game={counts['per_game']:>4}  "
+            f"advanced={counts['advanced']:>4}  per_poss={counts['per_poss']:>4}  "
+            f"play_by_play={counts['play_by_play']:>4}"
+        )
 
 
 if __name__ == "__main__":

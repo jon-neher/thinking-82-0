@@ -2,12 +2,12 @@
 Build the game dataset (players.json) from cached Basketball-Reference tables.
 
 Pipeline:
-  1. Merge per_game + advanced (+ per_poss for 1974+) per season, per player-team.
+  1. Merge per_game + advanced + per_poss (+ play_by_play when available) per season, per player-team.
   2. Compute per-season league baselines + robust z-score params (median/MAD).
   3. Normalize each player-season era-relative (per-100 basis, z-scores, rTS%).
   4. Estimate missing pre-1974 stats (STL/BLK/USG/BPM) shrunk toward priors.
   5. Precompute per-player model fields used by the TS scoring engine.
-  6. Select each player's PEAK season within each (team, decade).
+  6. Build each player's weighted multi-year blend within each (team, decade).
   7. Emit data/players.json.
 
 Real data only — no mocks. See docs/SCORING.md for the model spec.
@@ -49,15 +49,30 @@ TEAM_NAMES = {
     "TOR": "Toronto Raptors", "UTA": "Utah Jazz", "VAN": "Vancouver Grizzlies",
     "WAS": "Washington Wizards", "WSB": "Washington Bullets",
 }
+POSITION_ORDER = ["PG", "SG", "SF", "PF", "C"]
 
 # --- estimation priors (see docs/SCORING.md §6) ---
 STEAL_PRIOR = {"PG": 0.45, "SG": 0.30, "SF": 0.10, "PF": -0.20, "C": -0.45}
 BLOCK_PRIOR = {"PG": -0.85, "SG": -0.65, "SF": -0.25, "PF": 0.35, "C": 0.75}
 DBPM_PRIOR = {"PG": -0.15, "SG": -0.10, "SF": 0.0, "PF": 0.10, "C": 0.20}
 
-# Inclusion thresholds for a player's peak season to be draftable for a team+decade.
+# Inclusion thresholds for a player's blended profile to be draftable for a team+decade.
 MIN_GAMES = 20
 MIN_MPG = 12.0
+BLEND_RADIUS_YEARS = 1
+BLEND_MAX_SEASONS = 3
+POSITION_FLEX_THRESHOLD = 0.10
+CAREER_POSITION_THRESHOLD = 0.10
+FALLBACK_SECONDARY_SHARE = 0.30
+POINT_FORWARD_PG_ZAST_THRESHOLD = 2.2
+POINT_FORWARD_PG_USG_THRESHOLD = 24.0
+POSITION_SHARE_STATS = {
+    "PG": "pct_1",
+    "SG": "pct_2",
+    "SF": "pct_3",
+    "PF": "pct_4",
+    "C": "pct_5",
+}
 
 
 def f(x):
@@ -92,6 +107,33 @@ def norm_pos(pos: str | None):
     return valid[0], valid[1:]
 
 
+def row_team_abbr(row: dict):
+    return row.get("team_name_abbr") or row.get("team_id") or row.get("team")
+
+
+def keyed_rows(rows):
+    return {(r["player_id"], row_team_abbr(r)): r for r in rows if r.get("player_id")}
+
+
+def parse_position_shares(play_by_play_row: dict):
+    if not play_by_play_row:
+        return {}
+    shares = {}
+    total = 0.0
+    for pos, stat in POSITION_SHARE_STATS.items():
+        value = f(play_by_play_row.get(stat))
+        if value is None:
+            continue
+        pct_value = clamp(value / 100.0 if value > 1 else value, 0.0, 1.0)
+        if pct_value <= 0:
+            continue
+        shares[pos] = pct_value
+        total += pct_value
+    if total <= 0:
+        return {}
+    return {pos: value / total for pos, value in shares.items()}
+
+
 def robust_z(value, med, mad):
     if value is None or mad is None or mad == 0:
         return 0.0
@@ -109,12 +151,10 @@ def med_mad(vals):
 
 def merge_season(season: int):
     """Return list of merged player-team records for a season (no combined rows)."""
-    pg = {(r["player_id"], r.get("team_name_abbr")): r
-          for r in fetch.get_season_table(season, "per_game")}
-    adv = {(r["player_id"], r.get("team_name_abbr")): r
-           for r in fetch.get_season_table(season, "advanced")}
-    pp = {(r["player_id"], r.get("team_name_abbr")): r
-          for r in fetch.get_season_table(season, "per_poss")}
+    pg = keyed_rows(fetch.get_season_table(season, "per_game"))
+    adv = keyed_rows(fetch.get_season_table(season, "advanced"))
+    pp = keyed_rows(fetch.get_season_table(season, "per_poss"))
+    pbp = keyed_rows(fetch.get_season_table(season, "play_by_play"))
 
     out = []
     for key, p in pg.items():
@@ -123,9 +163,11 @@ def merge_season(season: int):
             continue
         a = adv.get(key, {})
         q = pp.get(key, {})
+        b = pbp.get(key, {})
         games = f(p.get("games")) or 0
         mpg = f(p.get("mp_per_g")) or 0.0
         primary, secondary = norm_pos(p.get("pos") or a.get("pos"))
+        pos_share = parse_position_shares(b)
 
         ppg = f(p.get("pts_per_g"))
         rpg = f(p.get("trb_per_g"))
@@ -152,6 +194,7 @@ def merge_season(season: int):
             "decade": decade_label(season),
             "primary": primary,
             "secondary": secondary,
+            "pos_share": pos_share,
             "games": int(games),
             "mpg": mpg,
             "minutes": mpg * games,
@@ -299,6 +342,161 @@ def model_fields(r, base):
     }
 
 
+def weighted_avg(records, weights, key):
+    num, den = 0.0, 0.0
+    for r, w in zip(records, weights):
+        v = r.get(key)
+        if v is None:
+            continue
+        num += w * float(v)
+        den += w
+    return (num / den) if den else None
+
+
+def weighted_vote_primary(records, weights):
+    score = defaultdict(float)
+    for r, w in zip(records, weights):
+        score[r["primary"]] += w
+    return max(score, key=score.get) if score else "SF"
+
+
+def weighted_secondary(records, weights, primary):
+    score = defaultdict(float)
+    for r, w in zip(records, weights):
+        for p in r["secondary"]:
+            if p != primary:
+                score[p] += w
+    return [p for p, _ in sorted(score.items(), key=lambda x: -x[1])[:2]]
+
+
+def weighted_position_profile(records, weights):
+    score = defaultdict(float)
+    total = 0.0
+    for r, w in zip(records, weights):
+        shares = r.get("pos_share") or {}
+        if shares:
+            for pos, share in shares.items():
+                score[pos] += w * share
+            total += w
+            continue
+        score[r["primary"]] += w
+        total += w
+        for pos in r["secondary"]:
+            score[pos] += w * FALLBACK_SECONDARY_SHARE
+            total += w * FALLBACK_SECONDARY_SHARE
+    if total <= 0:
+        return {"SF": 1.0}
+    return {pos: value / total for pos, value in score.items()}
+
+
+def build_career_position_history(records):
+    per_player = defaultdict(list)
+    for record in records:
+        per_player[record["player_id"]].append(record)
+
+    history = {}
+    for player_id, recs in per_player.items():
+        weights = [max((r.get("minutes") or 0), 1.0) for r in recs]
+        profile = weighted_position_profile(recs, weights)
+        positions = [p for p in POSITION_ORDER if profile.get(p, 0.0) >= CAREER_POSITION_THRESHOLD]
+        if not positions:
+            positions = [max(POSITION_ORDER, key=lambda p: profile.get(p, 0.0))]
+        history[player_id] = positions
+    return history
+
+
+def weighted_model_metric(records, weights, metric, default=0.0):
+    num = 0.0
+    den = 0.0
+    for record, weight in zip(records, weights):
+        value = record.get("model", {}).get(metric)
+        if value is None:
+            continue
+        num += weight * float(value)
+        den += weight
+    return (num / den) if den else default
+
+
+def blend_group(recs, career_position_history):
+    """Blend up to 3 nearby seasons around the peak season within a team+decade."""
+    eligible = [r for r in recs if r["games"] >= 30] or recs
+    anchor = max(eligible, key=lambda r: r["model"]["playerBaseNR"])
+    center = anchor["season"]
+
+    local = [r for r in recs if abs(r["season"] - center) <= BLEND_RADIUS_YEARS]
+    if len(local) < 2:
+        local = sorted(recs, key=lambda r: (abs(r["season"] - center), -r["minutes"]))
+    else:
+        local = sorted(local, key=lambda r: (abs(r["season"] - center), -r["minutes"]))
+    blend = local[:BLEND_MAX_SEASONS]
+
+    weights = []
+    for r in blend:
+        minute_w = clamp((r["minutes"] or 0) / 2400.0, 0.25, 1.0)
+        distance_w = 1.0 / (1.0 + abs(r["season"] - center))
+        weights.append(minute_w * distance_w)
+
+    local_position_profile = weighted_position_profile(blend, weights)
+    primary = max(POSITION_ORDER, key=lambda p: local_position_profile.get(p, 0.0))
+    positions = [p for p in POSITION_ORDER if local_position_profile.get(p, 0.0) >= POSITION_FLEX_THRESHOLD]
+    for pos in career_position_history.get(anchor["player_id"], []):
+        if pos not in positions:
+            positions.append(pos)
+    blended_z_ast = weighted_model_metric(blend, weights, "zAst")
+    blended_usg = weighted_model_metric(blend, weights, "usgEff")
+    if (
+        primary in {"SF", "PF"}
+        and blended_z_ast >= POINT_FORWARD_PG_ZAST_THRESHOLD
+        and blended_usg >= POINT_FORWARD_PG_USG_THRESHOLD
+        and "PG" not in positions
+    ):
+        positions.append("PG")
+    positions = [p for p in POSITION_ORDER if p in positions]
+    if primary not in positions:
+        positions.insert(0, primary)
+        positions = [p for p in POSITION_ORDER if p in positions]
+    secondary = [p for p in positions if p != primary]
+
+    out = dict(anchor)
+    out["name"] = anchor["name"]
+    out["primary"] = primary
+    out["secondary"] = secondary
+    out["positions"] = positions or [primary]
+    out["sample_seasons"] = sorted({r["season"] for r in blend})
+    out["blend_n"] = len(blend)
+
+    for key in [
+        "mpg", "ppg", "rpg", "apg", "spg", "bpg", "fg3a_pg", "fg3_pg",
+        "ts", "usg", "bpm", "obpm", "dbpm", "per", "fg3pct",
+        "pts100", "reb100", "ast100", "stl100", "blk100", "fg3a100"
+    ]:
+        out[key] = weighted_avg(blend, weights, key)
+
+    # Keep games/minutes as weighted profile levels (used for eligibility and display).
+    weighted_games = weighted_avg(blend, weights, "games")
+    out["games"] = int(round(weighted_games or 0))
+    out["minutes"] = (out["mpg"] or 0) * out["games"]
+
+    model_out = {}
+    for mk in anchor["model"].keys():
+        if isinstance(anchor["model"][mk], bool):
+            truth = 0.0
+            den = 0.0
+            for r, w in zip(blend, weights):
+                truth += w * (1.0 if r["model"][mk] else 0.0)
+                den += w
+            model_out[mk] = (truth / den) >= 0.5 if den else False
+        else:
+            num = 0.0
+            den = 0.0
+            for r, w in zip(blend, weights):
+                num += w * float(r["model"][mk])
+                den += w
+            model_out[mk] = round(num / den, 3) if den else 0.0
+    out["model"] = model_out
+    return out
+
+
 def main():
     all_recs = []
     for season in range(START, END + 1):
@@ -309,18 +507,18 @@ def main():
         all_recs.extend(recs)
         print(f"{season}: {len(recs)} player-team records")
 
-    # peak season per (player, team, decade)
+    # weighted multi-year blend per (player, team, decade)
     groups = defaultdict(list)
     for r in all_recs:
         groups[(r["player_id"], r["team"], r["decade"])].append(r)
+    career_position_history = build_career_position_history(all_recs)
 
     players = []
-    for key, recs in groups.items():
-        elig = [r for r in recs if r["games"] >= 30] or recs
-        peak = max(elig, key=lambda r: r["model"]["playerBaseNR"])
-        if peak["games"] < MIN_GAMES or peak["mpg"] < MIN_MPG:
+    for recs in groups.values():
+        profile = blend_group(recs, career_position_history)
+        if profile["games"] < MIN_GAMES or (profile["mpg"] or 0) < MIN_MPG:
             continue
-        players.append(peak)
+        players.append(profile)
 
     # assemble output
     teams_present = defaultdict(set)
@@ -331,7 +529,8 @@ def main():
         "meta": {
             "source": "Basketball-Reference (real data)",
             "seasons": [START, END],
-            "generated_categories": ["per_game", "advanced", "per_poss"],
+            "generated_categories": ["per_game", "advanced", "per_poss", "play_by_play"],
+            "aggregation": "3-year weighted blend around peak season within team+decade",
             "player_count": len(players),
         },
         "decades": [f"{d}s" for d in range(1960, 2030, 10)],
@@ -357,6 +556,8 @@ def serialize(p):
         "team": p["team"],
         "decade": p["decade"],
         "season": p["season"],
+        "sampleSeasons": p.get("sample_seasons", [p["season"]]),
+        "positions": p.get("positions", [p["primary"], *p["secondary"]]),
         "pos": p["primary"],
         "pos2": p["secondary"],
         "g": p["games"],
