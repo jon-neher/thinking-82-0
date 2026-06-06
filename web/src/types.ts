@@ -1,5 +1,13 @@
 export type DraftSlot = "PG" | "SG" | "SF" | "PF" | "C" | "SIXTH";
 export type Mode = "classic" | "hoopiq";
+export type SortKey = "name" | "pts" | "reb" | "ast" | "stl" | "blk";
+export type SortDirection = "asc" | "desc";
+
+export interface Roll {
+  team: string;
+  decade: string;
+  candidates: PlayerSeason[];
+}
 
 export interface PlayerMetrics {
   zPts: number;
@@ -49,6 +57,8 @@ export interface PlayerSeason {
   team: string;
   decade: string;
   season: number;
+  sampleSeasons?: number[];
+  positions?: string[];
   pos: string;
   pos2: string[];
   g: number;
@@ -63,6 +73,7 @@ export interface Dataset {
     source: string;
     seasons: number[];
     generated_categories: string[];
+    aggregation?: string;
     player_count: number;
   };
   decades: string[];
