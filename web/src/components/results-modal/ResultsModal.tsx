@@ -18,7 +18,7 @@ export function ResultsModal({ teamScore, fitTotal, onClose, onShare, onViewCour
           onClick={onClose}
           aria-label="Close results"
         >
-          \u00d7
+          ×
         </button>
         <h2>Final record</h2>
         <div className="record">

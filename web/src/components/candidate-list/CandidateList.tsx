@@ -57,11 +57,17 @@ export function CandidateList({
   };
 
   if (!roll) {
-    return <p className="empty-text">Spin to reveal players.</p>;
+    return (
+      <section className="panel candidates-panel">
+        <h2 className="panel-title">Available players</h2>
+        <p className="empty-text">Spin the machine to reveal eligible players.</p>
+      </section>
+    );
   }
 
   return (
-    <>
+    <section className="panel candidates-panel">
+      <h2 className="panel-title">Available players</h2>
       <div className="candidate-controls">
         <div className="position-pills">
           {POSITION_FILTERS.map((position) => (
@@ -125,7 +131,7 @@ export function CandidateList({
                 <span className="candidate-player">
                   <strong>{player.name}</strong>
                   <small>
-                    {positionsSummary(player)} \u2022 {seasonSummary(player)}
+                    {positionsSummary(player)} • {seasonSummary(player)}
                   </small>
                   {!hasOpenCompatibleSlot ? <small>No open slot right now</small> : null}
                 </span>
@@ -184,6 +190,6 @@ export function CandidateList({
         })}
         {!sortedCandidates.length ? <p className="empty-text">No players match your filter.</p> : null}
       </ul>
-    </>
+    </section>
   );
 }
