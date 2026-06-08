@@ -1,0 +1,90 @@
+phase: complete
+project:
+  name: thinking-82-0
+  repo_path: /Users/jneher/Documents/Personal-Projects/thinking-82-0
+analysis:
+  monorepo: false
+  apps:
+    - name: web
+      type: web-frontend
+      path_patterns:
+        - web/src/**
+        - web/index.html
+      framework: React
+      language: TypeScript
+      tooling: Vite
+      build_command: npm run build
+      dev_command: npm run dev
+      test_command: npm run test
+      test_tool: agent-browser
+    - name: data-pipeline
+      type: data-pipeline
+      path_patterns:
+        - data/pipeline/**
+        - data/players.json
+        - web/src/data/players.json
+      framework: Python scripts
+      language: Python
+      test_tool: curl
+  auth:
+    method: none
+    provider: none
+  feature_flags:
+    provider: none
+  integrations: {}
+  ci:
+    provider: none
+    workflows: []
+  tests:
+    frameworks:
+      - vitest
+    files:
+      - web/src/lib/scoring.test.ts
+  environments_detected:
+    - name: development
+      url: http://localhost:5173
+category_answers:
+  category_1:
+    default_target: development
+    restrictions:
+      - No data creation/deletion
+  category_2:
+    personas:
+      - name: guest
+        description: Anonymous user, no login
+        can_do:
+          - Play full draft flow
+          - View calculated team score and breakdown
+        cannot_do: []
+    account_provisioning: not_applicable
+    credentials_source: not_applicable
+  category_3:
+    flow_confirmation: keep_detected
+    success_criteria: strict_full_flow_assertions
+    multi_persona: false
+    persistent_data_cleanup: false
+  category_4:
+    skipped: true
+    reason: No external integrations detected
+  category_5:
+    auto_cleanup: false
+    strategy: none
+    instructions: No persistent test data is created
+  category_6:
+    imagemagick: true
+    detected_binary: /opt/homebrew/bin/magick
+  category_7:
+    skipped: true
+    reason: .github directory not found, no existing GitHub Actions setup
+  category_8:
+    failure_learning: suggest_in_report
+generated:
+  files:
+    - .factory/skills/qa/config.yaml
+    - .factory/skills/qa/SKILL.md
+    - .factory/skills/qa/REPORT-TEMPLATE.md
+    - .factory/skills/qa/.install-progress.yaml
+    - .factory/skills/qa-web/SKILL.md
+    - .factory/skills/qa-data-pipeline/SKILL.md
+  github_workflow_generated: false
+  generated_at: "2026-06-05"

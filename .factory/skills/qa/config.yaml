@@ -1,0 +1,59 @@
+project: thinking-82-0
+imagemagick: true
+
+environments:
+  development:
+    url: http://localhost:5173
+    restrictions:
+      - no data creation/deletion
+
+default_target: development
+
+auth:
+  method: none
+  provider: none
+
+personas:
+  - name: guest
+    description: Anonymous player without authentication
+    credentials_source: manual
+    test_focus:
+      - spin-and-roll flow
+      - player filtering and selection
+      - roster slotting and swaps
+      - final reveal and copy result
+    cannot_do: []
+
+apps:
+  web:
+    path_patterns:
+      - web/src/**
+      - web/index.html
+      - web/package.json
+      - web/vite.config.ts
+    skill: qa-web
+    test_tool: agent-browser
+    build_command: npm --prefix web run build
+    dev_command: npm --prefix web run dev -- --host 127.0.0.1 --port 5173
+  data-pipeline:
+    path_patterns:
+      - data/pipeline/**
+      - data/players.json
+      - web/src/data/players.json
+    skill: qa-data-pipeline
+    test_tool: curl
+    build_command: python3 data/pipeline/build.py
+
+feature_flags:
+  provider: none
+  dashboard_url: ""
+  how_to_override: Not applicable
+
+integrations: {}
+
+cleanup:
+  auto_cleanup: false
+  strategy: none
+  instructions: No persistent data is created by QA flows for this app.
+
+failure_learning: suggest_in_report
