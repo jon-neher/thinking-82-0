@@ -30,7 +30,7 @@ export function SpinMachine({
   return (
     <section className="panel machine">
       <div className="spin-header">
-        <h2>Spin Machine</h2>
+        <h2 className="panel-title">Spin machine</h2>
         <div className="skip-controls">
           <button
             type="button"

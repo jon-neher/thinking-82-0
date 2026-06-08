@@ -16,7 +16,7 @@ export function CourtBoard({
 }: CourtBoardProps) {
   return (
     <section className="panel court-panel">
-      <h2>Court board</h2>
+      <h2 className="panel-title">Court board</h2>
       <div className="court">
         <div className="lane" />
         <div className="rim" />
@@ -46,7 +46,7 @@ export function CourtBoard({
       </div>
       <p className={`court-hint ${selectedPlayer ? "active" : ""}`}>
         {selectedPlayer
-          ? `Placing {selectedPlayer.name} \u2014 click a highlighted position to assign or swap.`
+          ? `Placing ${selectedPlayer.name} — click a highlighted position to assign or swap.`
           : "Select a player from the list or click a filled court slot to reposition."}
       </p>
 

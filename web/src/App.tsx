@@ -120,21 +120,21 @@ export default function App() {
         onNewGame={resetGame}
       />
 
-      <main className="layout">
-        <SpinMachine
-          roll={roll}
-          spinning={spinning}
-          displayTeam={displayTeam}
-          displayDecade={displayDecade}
-          teamSkips={teamSkips}
-          decadeSkips={decadeSkips}
-          isComplete={isComplete}
-          dataset={dataset}
-          onSpin={handleSpin}
-          onReRollTeam={handleReRollTeam}
-          onReRollDecade={handleReRollDecade}
-        />
+      <SpinMachine
+        roll={roll}
+        spinning={spinning}
+        displayTeam={displayTeam}
+        displayDecade={displayDecade}
+        teamSkips={teamSkips}
+        decadeSkips={decadeSkips}
+        isComplete={isComplete}
+        dataset={dataset}
+        onSpin={handleSpin}
+        onReRollTeam={handleReRollTeam}
+        onReRollDecade={handleReRollDecade}
+      />
 
+      <main className="layout">
         <CandidateList
           roll={roll}
           mode={mode}
@@ -150,14 +150,14 @@ export default function App() {
           selectedPlayer={selectedPlayer}
           setSelectedPlayerId={setSelectedPlayerId}
         />
-      </main>
 
-      <CourtBoard
-        roster={roster}
-        selectedPlayer={selectedPlayer}
-        selectedSlots={selectedSlots}
-        onSlotClick={handleCourtSlotClick}
-      />
+        <CourtBoard
+          roster={roster}
+          selectedPlayer={selectedPlayer}
+          selectedSlots={selectedSlots}
+          onSlotClick={handleCourtSlotClick}
+        />
+      </main>
 
       {teamScore && showResults ? (
         <ResultsModal
