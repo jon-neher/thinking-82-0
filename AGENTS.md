@@ -5,7 +5,7 @@ The core loop remains addictive: drafting one real NBA player from a randomly sp
 **Key Innovations:**
 1. **6th Man Draft Slot**: Roster includes PG, SG, SF, PF, C, + Flex 6th Man.
 2. **Fit-Aware Scoring**: Rewards "team fit" (spacing, usage balance, and defensive coverage) rather than just raw stat accumulation.
-3. **The Ringer Aesthetic**: A bright, editorial design language (white canvas, bold accents, strong typography).
+\n
 
 ## Data Reality & Pipeline Quirks
 - **Source**: Basketball-Reference league tables (`per_game`, `advanced`, and `per_poss`).
@@ -25,8 +25,19 @@ The core loop remains addictive: drafting one real NBA player from a randomly sp
     - **Defensive FIT**: Rim protection for bigs, perimeter steals for guards.
     - **Position FIT**: Penalties for playing a player significantly out of position (except the Flex slot).
 4. **Win Projection**: `winPct = 1 / (1 + exp(-netRating / 7.5))`, maps to a scale of ~0 to ~82 wins.
-
 ## UI & UX Standards
+
+### Visual Identity: Editorial Premium
+The project uses a "High-End Sport" aesthetic combined with an editorial newspaper feel. 
+
+**Core Design Principles:**
+1. **Paper Palette**: Use off-whites, soft beiges (var(--paper), var--panel-soft), and pure white surfaces as the base. Avoid high-contrast bright colors for large backgrounds.
+2. **Ink & Highlights**: Primary text is deep ink (var(--ink)). Accents are limited to Editorial Teal (#1f7a85) for functional states and Craft Amber (#d2762c) for "active" drafting moments and high-attention buttons.
+3. **Sophisticated Typography**: 
+    - Use serif display fonts (Fraunces) for headers/record outputs to give a professional "journal" feel.
+    - Use clean sans-serif (Inter) for all interactive UI elements, inputs, and data rows.
+4. **Subtle Construction**: Utilize thin "hairline" borders (var(--line)) rather than heavy shadows or thick dividers to define sections.
+
 ### Player Statistics
 - **Advanced Stats Integration**: Advanced statistics should not be shown globally. They must be integrated into the player selection card and revealed via a "slide-down" animation only when a player is selected.
 - **Grid Alignment**: Advanced stat rows must use CSS Grid to perfectly mirror the column widths of the primary box score stats.
